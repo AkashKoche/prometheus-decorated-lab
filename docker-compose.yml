@@ -1,0 +1,67 @@
+version: '3.7'
+
+services:
+
+  flask-app:
+    build: .
+    container_name: flask-app
+
+    ports:
+      - "5000:5000"
+
+    environment:
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+
+    volumes:
+      - prometheus_multiproc:/tmp/prometheus
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    depends_on:
+      - prometheus
+
+    networks:
+      - prom-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+
+    ports:
+      - "9090:9090"
+    
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prom_data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=15d'
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    networks:
+      - prom-net
+
+
+volumes:
+  prom_data:
+  prometheus_multiproc:
+
+networks:
+  prom-net:
+    driver: bridge
